@@ -1,6 +1,6 @@
 //Define canvas for WebGL.
 var c = document.getElementById("canvas");
-var gl = c.getContext("webgl");
+var gl = c.getContext("webgl2", { antialias: 0 });
 
 
 
@@ -130,6 +130,14 @@ let raymarcherSettings = {
                 max: 1,
                 value: 1.0,
                 label: "Ambient Occlusion Strength"
+            },
+            {
+                id: "uTrail",
+                type: "range",
+                min: 0,
+                max: 1,
+                value: 0.0,
+                label: "Previous Frame Trail"
             },
             {
                 id: "uReflections",
@@ -337,8 +345,7 @@ function buildShaderProgram(vert, frag) {
     gl.attachShader(shaderProgram, compileShader(frag, gl.FRAGMENT_SHADER));
     
     gl.linkProgram(shaderProgram);
-    
-    
+
     return shaderProgram;
 }
 
@@ -366,6 +373,24 @@ function hex2rgb(hex) {
         parseInt(hex.substring(3, 5), 16),
         parseInt(hex.substring(5, 7), 16)
     ];
+}
+
+function createTexture(gl) {
+    let texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    return texture;
+}
+
+function createAndAddToTexture(gl, image) {
+    let texture = createTexture(gl);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    return texture;
 }
 
 
@@ -574,8 +599,18 @@ var vertexBuffer
 
 let rmSettings;
 
+let prevFrame;
+let prevFramebuffer;
+
+let blitProgram;
+
+
 //Initialize the stuff
 async function init() {
+
+    var blitVShader = (await request("shaders/vertex.vert")).response;
+    var blitFShader = (await request("shaders/blit.frag")).response;
+    blitProgram = buildShaderProgram(blitVShader, blitFShader);
     // var vertShader = (await request("vertex.glsl")).response;
     // var fragShader = (await request("fragment.glsl")).response;
     // prog = buildShaderProgram(vertShader, fragShader);
@@ -601,14 +636,32 @@ async function init() {
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
 
+    prevFrame = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, prevFrame);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    gl.texImage2D(
+        gl.TEXTURE_2D, 0, gl.RGBA, c.width, c.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null
+    );
+
+    prevFramebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, prevFramebuffer);
+    gl.framebufferTexture2D(
+        gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, prevFrame, 0
+    );
+    
     drawLoop();
 }
+
 
 //Draw loop
 var t = 0;
 async function drawLoop() {
     t++;
 
+    gl.viewport(0, 0, c.width, c.height);
 
 
     // uiParams.fractalRotationParams = [
@@ -678,14 +731,22 @@ async function drawLoop() {
     playerTransform.position = playerTransform.position.map(e => { return e * 0.9; });
 
 
+    //gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
 
-    gl.viewport(0, 0, c.width, c.height);
-    gl.clearColor(1.0, 1.0, 1.0, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    // gl.clearColor(1.0, 1.0, 1.0, 1.0);
+    // gl.clear(gl.COLOR_BUFFER_BIT);
     
     gl.useProgram(prog);
+
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, prevFrame);
+    gl.uniform1i(gl.getUniformLocation(prog, "prevFrame"), 0);
     
     //gl.uniform4fv(gl.getUniformLocation(prog, "uGlobalColor"), [t * 0.01, 0.0, 0.0, 0.0]);
+    gl.uniform1f(gl.getUniformLocation(prog, "time"), t);
     gl.uniform1f(gl.getUniformLocation(prog, "scaleFactor"), rmSettings.uFractalScaleFactor);
     gl.uniform3fv(gl.getUniformLocation(prog, "uPosition"), playerTransform.position);
     gl.uniform3fv(gl.getUniformLocation(prog, "lambertLightLocation"), uiParams.lambertLightLocation);
@@ -697,6 +758,9 @@ async function drawLoop() {
     gl.uniform1f(gl.getUniformLocation(prog, "uHitThreshold"), rmSettings.uRayHitThreshold);
     gl.uniform1f(gl.getUniformLocation(prog, "uRoughness"), rmSettings.uRoughness);
     gl.uniform1f(gl.getUniformLocation(prog, "uAOStrength"), rmSettings.uAOStrength);
+    gl.uniform1f(gl.getUniformLocation(prog, "uTrail"), rmSettings.uTrail);
+
+    //gl.
 
     let fractalRotateQuat = [0, 1, 0, 0];
 
@@ -717,6 +781,42 @@ async function drawLoop() {
         gl.FLOAT, false, 0, 0);
     
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+
+
+    //gl.flush();
+    
+    //gl.bindFramebuffer(gl.FRAMEBUFFER, prevFramebuffer);
+
+    //gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, c.width, c.height, 0);
+
+    //prevFrame = gl.createTexture(gl, c);
+
+
+    // gl.bindTexture(gl.TEXTURE_2D, prevFrame);
+
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, prevFramebuffer);
+
+    // gl.useProgram(blitProgram);
+
+    // gl.uniform2fv(gl.getUniformLocation(blitProgram, "uViewportSize"), [c.width, c.height]);
+    
+    // aVertexPosition =
+    //   gl.getAttribLocation(prog, "aVertexPosition");
+
+    // gl.enableVertexAttribArray(aVertexPosition);
+    // gl.vertexAttribPointer(aVertexPosition, 2,
+    //     gl.FLOAT, false, 0, 0);
+    
+    // gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    //gl.finish();
+
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, prevFramebuffer);
+    //gl.bindFramebuffer(gl.FRAMEBUFFER, prevFramebuffer);
+    gl.blitFramebuffer(0, 0, c.width, c.height, 0, 0, c.width, c.height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+
 
     if (keys.i) {
         keys.i = false;

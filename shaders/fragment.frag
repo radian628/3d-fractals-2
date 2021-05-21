@@ -15,6 +15,10 @@ uniform float uHitThreshold;
 uniform vec4 uIterationRotationQuaternion;
 uniform float uRoughness;
 uniform float uAOStrength;
+uniform sampler2D prevFrame;
+uniform float uTrail;
+
+varying highp vec2 vTexCoord; 
 
 //iteraetion count
 #define ITERATIONS 0.0
@@ -161,7 +165,8 @@ vec3 getColor(vec3 position, vec3 normal, int steps, vec3 shadowPosition, vec3 b
 //marches the rays, calculates normals, determines and returns color, etc.
 void main() {
 	vec3 coords = gl_FragCoord.xyz / (uViewportSize.y) - vec3(uViewportSize.x / uViewportSize.y * 0.5, 0.5, 0.0);
-	coords.x *= 1.5 * fov;
+	vec2 texCoords = coords.xy;
+    coords.x *= 1.5 * fov;
 	coords.y *= 1.5 * fov;
 	
 
@@ -225,6 +230,7 @@ void main() {
 	// } else {
     //     colorFactor = uShadowBrightness;
 	// }
-	gl_FragColor = vec4(outColor, 1.0);//vec4(outColor * (1.0 - float(steps1) / float(STEPS)) * colorFactor, 1.0);
+	//gl_FragColor = vec4(outColor, 1.0);
+    gl_FragColor = mix(vec4(outColor, 1.0), vec4(texture2D(prevFrame, vTexCoord).rgb, 1.0), uTrail);//vec4(outColor * (1.0 - float(steps1) / float(STEPS)) * colorFactor, 1.0);
     //gl_FragColor = vec4(normal * 0.5 + 0.5, 1.0);
 }
