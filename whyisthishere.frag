@@ -147,15 +147,25 @@ void main() {
 	vec3 coords = gl_FragCoord.xyz / (uViewportSize.y) - vec3(uViewportSize.x / uViewportSize.y * 0.5, 0.5, 0.0);
 	coords.x *= 1.5 * fov;
 	coords.y *= 1.5 * fov;
-	float distToSurface = 0.0;
-	int steps1 = STEPS;
 	
 
     vec3 cameraRay = rotateQuat(vec3(coords.x, 1.0, coords.y), uRotationQuaternion);
 
+
+	float distToSurface = 0.0;
+	int steps1 = STEPS;
     vec3 normal;
     vec3 color;
     vec3 dist = marchRayTrio(uPosition, cameraRay, distToSurface, steps1, normal, color);
+
+
+	float distToSurface2 = 0.0;
+	int steps2 = STEPS;
+    vec3 normal2;
+    vec3 color2;
+    vec3 dist2 = marchRayTrio(uPosition, reflect(cameraRay, normal), distToSurface2, steps2, normal2, color2);
+
+    vec3 outColor = (color + color2) / 2.0;
 
     vec3 adjustedLightLocation = lambertLightLocation;
 
@@ -166,10 +176,10 @@ void main() {
     float colorFactor;
 
 	if (sign(shadowRay.x - lambertLightLocation.x) != sign(dist.x - lambertLightLocation.x)) {
-        colorFactor = 1.0;//mix(uShadowBrightness, 1.0, lambertShading(vec3(1.0), normal, lambertLightLocation - dist).x);//;
+        colorFactor = mix(uShadowBrightness, 1.0, lambertShading(vec3(1.0), normal, lambertLightLocation - dist).x);//;
 	} else {
         colorFactor = uShadowBrightness;
 	}
-	gl_FragColor = vec4(color * (1.0 - float(steps1) / float(STEPS)) * colorFactor, 1.0);
+	gl_FragColor = vec4(outColor * (1.0 - float(steps1) / float(STEPS)) * colorFactor, 1.0);
     //gl_FragColor = vec4(normal, 1.0);
 }

@@ -12,8 +12,16 @@ uniform float fov;
 uniform vec3 uFractalColor;
 uniform float uShadowBrightness;
 uniform float uHitThreshold;
-
 uniform vec4 uIterationRotationQuaternion;
+uniform float uRoughness;
+uniform float uAOStrength;
+
+//iteraetion count
+#define ITERATIONS 0.0
+
+#define STEPS 0
+
+#define REFLECTIONS 1
 
 //rotate using quaternion
 vec3 rotateQuat(vec3 position, vec4 q)
@@ -32,10 +40,6 @@ vec3 rayReflectIteration(vec3 a, vec3 offset, float iteration) {
 	return rotateQuat(reflectAxes(a) + offset, uIterationRotationQuaternion);
 }
 
-//iteraetion count
-#define ITERATIONS 0.0
-
-#define STEPS 0
 
 //cube signed distance function (SDF)
 float cubeSDF(vec3 rayPosition, vec3 cubePosition, float cubeSize) {
@@ -75,9 +79,9 @@ vec3 marchCameraRay(vec3 origin, vec3 direction, out float finalMinDist, out int
 	for (int i = 0; i < STEPS; i++) {
 		minDist = globalSDF(position, color);
 		position += directionNormalized * minDist;
-		if (minDist < uHitThreshold) {
+		if (minDist > uHitThreshold) {
 			stepsBeforeThreshold = i;
-            break;
+            //break;
 		}
 	}
 	finalMinDist = minDist;
@@ -120,8 +124,8 @@ vec3 marchRayTrio(vec3 coords, vec3 direction, out float finalMinDist, out int s
 	vec3 dist = marchCameraRay(coords, direction, finalMinDist, stepsBeforeThreshold, color);
     vec3 dirNormal1 = normalize(cross(direction, vec3(1.0, 1.0, 1.0)));
     vec3 dirNormal2 = normalize(cross(direction, dirNormal1));
-    vec3 nDistX = marchNormalFindingRay(coords, direction + dirNormal1 * 0.0001);
-    vec3 nDistY = marchNormalFindingRay(coords, direction + dirNormal2 * 0.0001);
+    vec3 nDistX = marchNormalFindingRay(coords + dirNormal1 * 0.00024, direction);
+    vec3 nDistY = marchNormalFindingRay(coords + dirNormal2 * 0.00024, direction);
     normal = -normalize(cross(dist - nDistX, dist - nDistY));
     return dist;
 }
@@ -133,7 +137,7 @@ vec3 lightSource2 = vec3(1.0, 0.6, 0.5) * 2.5;
 //lambertian diffuse shading
 vec3 lambertShading(vec3 color, vec3 normal, vec3 light) {
 	vec3 lightNormalized = normalize(light);
-	float lightIntensity = max(0.0, dot(normal, lightNormalized));
+	float lightIntensity = max(0.0, dot(normal, lightNormalized)) / dot(light, light);
 	return color * lightIntensity;
 }
 
@@ -142,34 +146,85 @@ float rand(vec2 co){
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
+vec3 getColor(vec3 position, vec3 normal, int steps, vec3 shadowPosition, vec3 baseColor) {
+    float colorFactor;
+    
+	if (sign(shadowPosition.x - lambertLightLocation.x) != sign(position.x - lambertLightLocation.x)) {
+        colorFactor = mix(uShadowBrightness, 1.0, lambertShading(vec3(1.0), normal, lambertLightLocation - position).x);//;
+	} else {
+        colorFactor = uShadowBrightness;
+	}
+
+    return baseColor * (1.0 - float(steps) / float(STEPS) * uAOStrength) * colorFactor;
+}
+
 //marches the rays, calculates normals, determines and returns color, etc.
 void main() {
 	vec3 coords = gl_FragCoord.xyz / (uViewportSize.y) - vec3(uViewportSize.x / uViewportSize.y * 0.5, 0.5, 0.0);
 	coords.x *= 1.5 * fov;
 	coords.y *= 1.5 * fov;
-	float distToSurface = 0.0;
-	int steps1 = STEPS;
 	
 
+    vec3 outColor = vec3(0.0);
+
+    vec3 rayStartPos = uPosition;
     vec3 cameraRay = rotateQuat(vec3(coords.x, 1.0, coords.y), uRotationQuaternion);
 
-    vec3 normal;
-    vec3 color;
-    vec3 dist = marchRayTrio(uPosition, cameraRay, distToSurface, steps1, normal, color);
+    for (int i = 0; i < REFLECTIONS; i++) {
 
-    vec3 adjustedLightLocation = lambertLightLocation;
+        float distToSurface = 0.0;
+        int steps1 = STEPS;
+        vec3 normal;
+        vec3 color;
+        vec3 rayHit = marchRayTrio(rayStartPos, cameraRay, distToSurface, steps1, normal, color);
+        
+        float shadowDistToSurface = 0.0;
+        int shadowSteps = STEPS;
+        vec3 shadowRayHit1 = marchShadowRay(rayHit + (lambertLightLocation - rayHit) * uHitThreshold * 10.0, (lambertLightLocation - rayHit), shadowDistToSurface, shadowSteps);
 
-	float shadowDistToSurface = 0.0;
-	int shadowSteps = STEPS;
-	vec3 shadowRay = marchShadowRay(dist + (adjustedLightLocation - dist) * uHitThreshold * 10.0, (adjustedLightLocation - dist), shadowDistToSurface, shadowSteps);
+        outColor += getColor(rayHit, normal, steps1, shadowRayHit1, color);
 
-    float colorFactor;
+        vec3 reflectVec = reflect(cameraRay, normal);
+        
+        rayStartPos = rayHit + reflectVec * uHitThreshold * 15.0;
+        cameraRay = reflectVec + vec3(
+            rand(coords.xy + vec2(time, time)),
+            rand(coords.xy + vec2(time + 234.0, -time)),
+            rand(coords.xy + vec2(-time - 76.0, 55.0 + time))
+        ) * uRoughness;
 
-	if (sign(shadowRay.x - lambertLightLocation.x) != sign(dist.x - lambertLightLocation.x)) {
-        colorFactor = 1.0;//mix(uShadowBrightness, 1.0, lambertShading(vec3(1.0), normal, lambertLightLocation - dist).x);//;
-	} else {
-        colorFactor = uShadowBrightness;
-	}
-	gl_FragColor = vec4(color * (1.0 - float(steps1) / float(STEPS)) * colorFactor, 1.0);
-    //gl_FragColor = vec4(normal, 1.0);
+    }
+
+    outColor /= float(REFLECTIONS);
+    outColor *= 2.0;
+
+    /*
+    vec3 reflectVec = reflect(cameraRay, normal);
+
+	float distToSurface2 = 0.0;
+	int steps2 = STEPS;
+    vec3 normal2;
+    vec3 color2;
+    vec3 rayHit2 = marchRayTrio(rayHit + reflectVec * uHitThreshold * 15.0, reflectVec, distToSurface2, steps2, normal2, color2);
+
+	float shadowDistToSurface2 = 0.0;
+	int shadowSteps2 = STEPS;
+	vec3 shadowRayHit2 = marchShadowRay(rayHit2 + (lambertLightLocation - rayHit2) * uHitThreshold * 10.0, (lambertLightLocation - rayHit2), shadowDistToSurface, shadowSteps2);
+    */
+    //vec3 outColor = (color + color2 * lambertShading(vec3(1.0), normal2, lambertLightLocation - dist2)) / 2.0;
+
+    // vec3 outColor = (
+    //     getColor(rayHit, normal, steps1, shadowRayHit1, color) +
+    //     getColor(rayHit2, normal2, steps2, shadowRayHit2, color2)
+    // ) / 2.0;
+
+    // float colorFactor;
+
+	// if (sign(shadowRay.x - lambertLightLocation.x) != sign(dist.x - lambertLightLocation.x)) {
+    //     colorFactor = mix(uShadowBrightness, 1.0, lambertShading(vec3(1.0), normal, lambertLightLocation - dist).x);//;
+	// } else {
+    //     colorFactor = uShadowBrightness;
+	// }
+	gl_FragColor = vec4(outColor, 1.0);//vec4(outColor * (1.0 - float(steps1) / float(STEPS)) * colorFactor, 1.0);
+    //gl_FragColor = vec4(normal * 0.5 + 0.5, 1.0);
 }

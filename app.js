@@ -2,6 +2,260 @@
 var c = document.getElementById("canvas");
 var gl = c.getContext("webgl");
 
+
+
+//=============================== USER INTERFACE =================================
+let raymarcherSettings = {
+    "Instructions": {
+        description: "Use WASD, Space, and Shift to move. Click the screen to control rotation w/ mouse, use escape to exit rotation mode. Press I to take a screenshot."
+    },
+    "UI and Viewer Controls": {
+        settings: [
+            {
+                id: "hideUI",
+                type: "checkbox",
+                value: true,
+                label: "Hide UI when controlling viewer"
+            },
+            {
+                id: "playerSpeed",
+                type: "range",
+                min: -4,
+                max: 1,
+                value: -1,
+                label: "Player Speed",
+                transformer: num => {
+                    return Math.pow(10, num);
+                }
+            }
+        ]
+    },
+    "Screenshot Controls": {
+        settings: [   
+            {
+                id: "screenshotUseScreenSize",
+                type: "checkbox",
+                value: true,
+                label: "Use size of current screen"
+            },
+            {
+                id: "screenshotRaymarchingSteps",
+                type: "range",
+                min: 0,
+                max: 1024,
+                value: 512,
+                label: "Screenshot Raymarching Steps"
+            },
+            {
+                id: "screenshotWidth",
+                type: "number",
+                value: 1920,
+                label: "Screenshot Width (px)"
+            },
+            {
+                id: "screenshotHeight",
+                type: "number",
+                value: 1080,
+                label: "Screenshot Height (px)"
+            }
+        ]
+    },
+    "Fractal Controls": {
+        settings: [
+            {
+                id: "fractalRotation1",
+                type: "range",
+                min: -Math.PI,
+                max: Math.PI,
+                value: 1,
+                label: "Fractal Rotation 1"
+            },
+            {
+                id: "fractalRotation2",
+                type: "range",
+                min: -Math.PI,
+                max: Math.PI,
+                value: 1,
+                label: "Fractal Rotation 2"
+            },
+            {
+                id: "fractalRotation3",
+                type: "range",
+                min: -Math.PI,
+                max: Math.PI,
+                value: 1,
+                label: "Fractal Rotation 3"
+            },
+            {
+                id: "uFractalScaleFactor",
+                type: "range",
+                min: 0,
+                max: 1,
+                value: 0.5,
+                label: "Fractal Scale Factor"
+            },
+            {
+                id: "uFractalIterations",
+                type: "range",
+                min: 1,
+                max: 22,
+                value: 7,
+                step: 1,
+                label: "Fractal Iterations",
+                recompile: true
+            },
+        ]
+    },
+    "Rendering Controls": {
+        settings: [
+            {
+                id: "uFractalColor",
+                type: "color",
+                value: "#444444",
+                label: "Fractal Color",
+                transformer: hex2rgb
+            },
+            {
+                id: "uShadowBrightness",
+                type: "range",
+                min: 0,
+                max: 1,
+                value: 0.5,
+                label: "Shadow Brightness"
+            },
+            {
+                id: "uAOStrength",
+                type: "range",
+                min: 0,
+                max: 1,
+                value: 1.0,
+                label: "Ambient Occlusion Strength"
+            },
+            {
+                id: "uReflections",
+                type: "range",
+                min: 1,
+                max: 8,
+                value: 1,
+                step: 1,
+                label: "Reflections",
+                recompile: true
+            },
+            {
+                id: "uRoughness",
+                type: "range",
+                min: 0,
+                max: 0.99,
+                value: 0,
+                label: "Reflection Roughness"
+            },
+            {
+                id: "uFOV",
+                type: "range",
+                min: 0,
+                max: 4,
+                value: 1.5,
+                label: "FOV"
+            },
+            {
+                id: "uRaymarchingSteps",
+                type: "range",
+                min: 0,
+                max: 1024,
+                value: 24,
+                step: 1,
+                label: "Raymarching Steps",
+                recompile: true
+            },
+            {
+                id: "uRayHitThreshold",
+                type: "range",
+                min: -6,
+                max: 0,
+                value: -4,
+                label: "Ray Hit Threshold",
+                transformer: num => {
+                    return Math.pow(10, num);
+                }
+            }
+        ]
+    }
+}
+
+function createRaymarcherSettingsMenu(container, settings, recompileShaderHandler) {
+    let currentValues = {};
+    Object.keys(settings).forEach(headerName => {
+        let header = document.createElement("h2");
+        header.innerText = headerName;
+        container.appendChild(header);
+
+        if (settings[headerName].description) {
+            let desc = document.createElement("p");
+            desc.innerText = settings[headerName].description;
+            container.appendChild(desc);
+        }
+
+        if (settings[headerName].settings) {
+            settings[headerName].settings.forEach(setting => {
+                let label = document.createElement("label");
+                label.innerText = setting.label;
+
+                let input = document.createElement("input");
+                input.type = setting.type;
+
+                if (setting.type == "range") {
+                    input.min = setting.min;
+                    input.max = setting.max;
+                    input.className = "range-input";
+                    input.step = setting.step || 0.001;
+                } else if (setting.type == "number") {
+                    input.className = "range-input";
+                }
+
+                let inputListener = e => {
+                    let elem = e.currentTarget;
+                    let value = (elem.type == "checkbox") ? elem.checked : elem.value;
+                    if (elem.type == "number" || elem.type == "range") {
+                        value = Number(value);
+                    }
+                    if (setting.transformer) value = setting.transformer(value);
+                    currentValues[elem.id] = value;
+                };
+
+
+                if (setting.type == "checkbox") {
+                    input.checked = setting.value;
+                } else {
+                    input.value = setting.value;
+                    //if (setting.transformer) console.log(setting.transformer(setting.value));
+                    //if (setting.transformer) input.value = setting.value;
+                }
+                input.id = setting.id;
+
+                inputListener({
+                    currentTarget: input
+                });
+
+
+                input.addEventListener("input", inputListener);
+
+                if (setting.recompile) {
+                    console.log("e")
+                    input.addEventListener("change", e => {
+                        recompileShaderHandler();
+                    });
+                }
+
+                container.appendChild(label);
+                container.appendChild(input);
+                container.appendChild(document.createElement("br"));
+            });
+        }
+    });
+
+    return currentValues;
+}
+
 c.requestPointerLock = c.requestPointerLock ||
                             c.mozRequestPointerLock;
 document.exitPointerLock = document.exitPointerLock ||
@@ -19,7 +273,7 @@ document.addEventListener('mozpointerlockchange', pointerLockHandler, false);
 function pointerLockHandler(e) {
     pointerLockEnabled = document.pointerLockElement === c ||
     document.mozPointerLockElement === c;
-    if (pointerLockEnabled && document.getElementById("ui-disappear").checked) {
+    if (pointerLockEnabled && rmSettings.hideUI) {
         document.getElementById("ui").style.opacity = 0;
     } else {
         document.getElementById("ui").style.opacity = null;
@@ -50,12 +304,15 @@ window.addEventListener("resize", resizeWindow);
 
 var keys = {};
 document.addEventListener("keydown", function (e) {
-    keys[e.key] = true;
+    keys[e.key.toLowerCase()] = true;
 });
 document.addEventListener("keyup", function (e) {
-    keys[e.key] = false;
+    keys[e.key.toLowerCase()] = false;
 });
 
+
+
+//=============================== GENERAL UTILS =================================
 //Compiles a shader.
 function compileShader(shaderCode, type) {
 	var shader = gl.createShader(type);
@@ -85,7 +342,7 @@ function buildShaderProgram(vert, frag) {
     return shaderProgram;
 }
 
-//xmlhttprequest promise
+//xmlhttprequest promise (haha this is just a crappy fetch api lmao)
 async function request(text) {
     var req = new XMLHttpRequest();
     var returnPromise = new Promise((resolve, reject) => {
@@ -102,28 +359,18 @@ async function request(text) {
     return returnPromise;
 }
 
-var prog;
-var vertexBuffer
 
-//Initialize the stuff
-async function init() {
-    // var vertShader = (await request("vertex.glsl")).response;
-    // var fragShader = (await request("fragment.glsl")).response;
-    // prog = buildShaderProgram(vertShader, fragShader);
-    await recompileShader();
-    
-    var vertexArray = new Float32Array([
-    	-1, 1, 1, 1, 1, -1,
-     	-1, 1, 1, -1, -1, -1
-    ]);
-    
-    vertexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
-
-    drawLoop();
+function hex2rgb(hex) {
+    return [
+        parseInt(hex.substring(1, 3), 16),
+        parseInt(hex.substring(3, 5), 16),
+        parseInt(hex.substring(5, 7), 16)
+    ];
 }
 
+
+
+//=============================== LINEAR ALGEBRA =================================
 function matMultiply(vec, mat) {
     return [
         vec[0] * mat[0] + vec[1] * mat[3] + vec[2] * mat[6],
@@ -272,6 +519,8 @@ function quatToEuler(q) {
     ]
 }
 
+//===================================== SETTINGS ===================================
+
 var playerTransform = {
     position: [0, 0, 0],
     rotation: [0, 0, 0],
@@ -281,33 +530,28 @@ var playerTransform = {
 
 var uiParams = {
     fractalRotationParams: [0.1, 0.1, 0.1],
-    playerSpeedMultiplier: 1,
+    playerSpeedMultiplier: 100,
     scaleFactor: 0.5,
     fov: 1,
     lambertLightLocation: [0, 0, 0],
     fractalColor: [1.0, 1.0, 1.0],
-    fractalIterations: 12,
-    raymarchingSteps: 64,
+    fractalIterations: 7,
+    raymarchingSteps: 24,
     shadowBrightness: 0.4,
     rayHitThreshold: 0.0001,
     shaderChoice: "fragment.frag"
 }
 
-function hex2rgb(hex) {
-    return [
-        parseInt(hex.substring(1, 3), 16),
-        parseInt(hex.substring(3, 5), 16),
-        parseInt(hex.substring(5, 7), 16)
-    ];
-}
 
 async function recompileShader() {
     var vertShader = (await request("shaders/vertex.vert")).response;
     var fragShader = (await request("shaders/" + uiParams.shaderChoice)).response;
     fragShader = fragShader.replace("#define ITERATIONS", "//");
     fragShader = fragShader.replace("#define STEPS", "//");
-    fragShader = fragShader.replace(/ITERATIONS/g, uiParams.fractalIterations + ".0");
-    fragShader = fragShader.replace(/STEPS/g, uiParams.raymarchingSteps);
+    fragShader = fragShader.replace("#define REFLECTIONS", "//");
+    fragShader = fragShader.replace(/ITERATIONS/g, rmSettings.uFractalIterations + ".0");
+    fragShader = fragShader.replace(/STEPS/g, rmSettings.uRaymarchingSteps);
+    fragShader = fragShader.replace(/REFLECTIONS/g, rmSettings.uReflections);
     prog = buildShaderProgram(vertShader, fragShader);
 }
 
@@ -324,6 +568,42 @@ document.getElementById("shader-choice").onchange = function () {
     recompileShader();
 }
 
+
+var prog;
+var vertexBuffer
+
+let rmSettings;
+
+//Initialize the stuff
+async function init() {
+    // var vertShader = (await request("vertex.glsl")).response;
+    // var fragShader = (await request("fragment.glsl")).response;
+    // prog = buildShaderProgram(vertShader, fragShader);
+    
+    let uiElem = document.getElementById("ui");
+    uiElem.innerHTML = "";
+    //while (uiElem.h) uiElem.removeChild(uiElem.lastChild);
+    rmSettings = createRaymarcherSettingsMenu(
+        uiElem,
+        raymarcherSettings,
+        recompileShader
+    );
+
+
+    await recompileShader();
+    
+    var vertexArray = new Float32Array([
+    	-1, 1, 1, 1, 1, -1,
+     	-1, 1, 1, -1, -1, -1
+    ]);
+    
+    vertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
+
+    drawLoop();
+}
+
 //Draw loop
 var t = 0;
 async function drawLoop() {
@@ -331,17 +611,17 @@ async function drawLoop() {
 
 
 
-    uiParams.fractalRotationParams = [
-        getValue("fractal-rotation-0"),
-        getValue("fractal-rotation-1"),
-        getValue("fractal-rotation-2")
-    ];
-    uiParams.playerSpeedMultiplier = Math.pow(10, getValue("player-speed"));
-    uiParams.scaleFactor = getValue("scale-factor");
-    uiParams.fov = getValue("fov");
-    uiParams.fractalColor = hex2rgb(document.getElementById("fractal-color").value).map(e => { return e / 64; });
-    uiParams.shadowBrightness = getValue("shadow-brightness");
-    uiParams.rayHitThreshold = Math.pow(10, getValue("ray-hit-threshold"));
+    // uiParams.fractalRotationParams = [
+    //     getValue("fractal-rotation-0"),
+    //     getValue("fractal-rotation-1"),
+    //     getValue("fractal-rotation-2")
+    // ];
+    // uiParams.playerSpeedMultiplier = Math.pow(10, getValue("player-speed"));
+    // uiParams.scaleFactor = getValue("scale-factor");
+    // uiParams.fov = getValue("fov");
+    // uiParams.fractalColor = hex2rgb(document.getElementById("fractal-color").value).map(e => { return e / 64; });
+    // uiParams.shadowBrightness = getValue("shadow-brightness");
+    // uiParams.rayHitThreshold = Math.pow(10, getValue("ray-hit-threshold"));
 
     var acceleration = [0, 0, 0]
 
@@ -357,11 +637,11 @@ async function drawLoop() {
     if (keys.d) {
         acceleration[0] += 0.01;
     }
-    if (keys.q) {
-        acceleration[2] += 0.01;
+    if (keys.shift) {
+        acceleration[2] += -0.01;
     }
     if (keys[" "]) {
-        acceleration[2] += -0.01;
+        acceleration[2] += 0.01;
     }
     if (keys.ArrowUp) {
         playerTransform.quatRotation = quatMultiply(quatAngleAxis(0.01, vectorQuaternionMultiply(playerTransform.quatRotation, [1, 0, 0])), playerTransform.quatRotation)
@@ -379,17 +659,17 @@ async function drawLoop() {
         uiParams.lambertLightLocation = playerTransform.position.concat();
     }
     if (keys.i) {
-        if (!document.getElementById("use-current-screen-size").checked) {
-            c.width = getValue("screenshot-width");
-            c.height = getValue("screenshot-height");
-        }
-        var prevRSteps = uiParams.raymarchingSteps;
-        uiParams.raymarchingSteps = getValue("screenshot-raymarching-steps");
-        await recompileShader();
-        uiParams.raymarchingSteps = prevRSteps;
+        // if (!document.getElementById("use-current-screen-size").checked) {
+        //     c.width = getValue("screenshot-width");
+        //     c.height = getValue("screenshot-height");
+        // }
+        // var prevRSteps = uiParams.raymarchingSteps;
+        // uiParams.raymarchingSteps = getValue("screenshot-raymarching-steps");
+        // await recompileShader();
+        // uiParams.raymarchingSteps = prevRSteps;
     }
 
-    acceleration = acceleration.map(e => { return e * uiParams.playerSpeedMultiplier; });
+    acceleration = acceleration.map(e => { return e * rmSettings.playerSpeed; });
 
     acceleration = vectorQuaternionMultiply(playerTransform.quatRotation, acceleration);//matMultiply(matMultiply(matMultiply(acceleration, rotateX(playerTransform.rotation[1])), rotateZ(playerTransform.rotation[0])), rotateY(playerTransform.rotation[2]));
 
@@ -406,31 +686,26 @@ async function drawLoop() {
     gl.useProgram(prog);
     
     //gl.uniform4fv(gl.getUniformLocation(prog, "uGlobalColor"), [t * 0.01, 0.0, 0.0, 0.0]);
-    gl.uniform1f(gl.getUniformLocation(prog, "scaleFactor"), uiParams.scaleFactor);
+    gl.uniform1f(gl.getUniformLocation(prog, "scaleFactor"), rmSettings.uFractalScaleFactor);
     gl.uniform3fv(gl.getUniformLocation(prog, "uPosition"), playerTransform.position);
     gl.uniform3fv(gl.getUniformLocation(prog, "lambertLightLocation"), uiParams.lambertLightLocation);
     gl.uniform4fv(gl.getUniformLocation(prog, "uRotationQuaternion"), playerTransform.quatRotation);
     gl.uniform2fv(gl.getUniformLocation(prog, "uViewportSize"), [c.width, c.height]);
-    gl.uniform1f(gl.getUniformLocation(prog, "fov"), uiParams.fov);
-    gl.uniform3fv(gl.getUniformLocation(prog, "uFractalColor"), uiParams.fractalColor);
-    gl.uniform1f(gl.getUniformLocation(prog, "uShadowBrightness"), uiParams.shadowBrightness);
-    gl.uniform1f(gl.getUniformLocation(prog, "uHitThreshold"), uiParams.rayHitThreshold);
+    gl.uniform1f(gl.getUniformLocation(prog, "fov"), rmSettings.uFOV);
+    gl.uniform3fv(gl.getUniformLocation(prog, "uFractalColor"), rmSettings.uFractalColor);
+    gl.uniform1f(gl.getUniformLocation(prog, "uShadowBrightness"), rmSettings.uShadowBrightness);
+    gl.uniform1f(gl.getUniformLocation(prog, "uHitThreshold"), rmSettings.uRayHitThreshold);
+    gl.uniform1f(gl.getUniformLocation(prog, "uRoughness"), rmSettings.uRoughness);
+    gl.uniform1f(gl.getUniformLocation(prog, "uAOStrength"), rmSettings.uAOStrength);
 
     let fractalRotateQuat = [0, 1, 0, 0];
 
-    fractalRotateQuat = quatMultiply(fractalRotateQuat, quatAngleAxis(uiParams.fractalRotationParams[0], [1, 0, 0]));
-    fractalRotateQuat = quatMultiply(fractalRotateQuat, quatAngleAxis(uiParams.fractalRotationParams[1], [0, 1, 0]));
-    fractalRotateQuat = quatMultiply(fractalRotateQuat, quatAngleAxis(uiParams.fractalRotationParams[2], [0, 0, 1]));
+    fractalRotateQuat = quatMultiply(fractalRotateQuat, quatAngleAxis(rmSettings.fractalRotation1, [1, 0, 0]));
+    fractalRotateQuat = quatMultiply(fractalRotateQuat, quatAngleAxis(rmSettings.fractalRotation2, [0, 1, 0]));
+    fractalRotateQuat = quatMultiply(fractalRotateQuat, quatAngleAxis(rmSettings.fractalRotation3, [0, 0, 1]));
+    //console.log(fractalRotateQuat);
 
-    gl.uniform4fv(gl.getUniformLocation(prog, "uIterationRotationQuaternion"), /*false,*/fractalRotateQuat
-        // matMultiplyMat(
-        //     rotateZ(uiParams.fractalRotationParams[2]),
-        //     matMultiplyMat(
-        //         rotateX(uiParams.fractalRotationParams[0]),
-        //         rotateY(uiParams.fractalRotationParams[1])
-        //     )
-        // )
-    );
+    gl.uniform4fv(gl.getUniformLocation(prog, "uIterationRotationQuaternion"), fractalRotateQuat);
     
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     
