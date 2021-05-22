@@ -109,6 +109,20 @@ let raymarcherSettings = {
     "Rendering Controls": {
         settings: [
             {
+                id: "additive",
+                type: "checkbox",
+                value: false,
+                label: "Additive Blending",
+                recompile: true
+            },
+            {
+                id: "metallic",
+                type: "checkbox",
+                value: false,
+                label: "Metallic Material",
+                recompile: true
+            },
+            {
                 id: "uFractalColor",
                 type: "color",
                 value: "#444444",
@@ -133,9 +147,9 @@ let raymarcherSettings = {
             },
             {
                 id: "uTrail",
-                type: "range",
-                min: 0,
-                max: 1,
+                type: "number",
+                // min: 0,
+                // max: 1,
                 value: 0.0,
                 label: "Previous Frame Trail"
             },
@@ -577,21 +591,23 @@ async function recompileShader() {
     fragShader = fragShader.replace(/ITERATIONS/g, rmSettings.uFractalIterations + ".0");
     fragShader = fragShader.replace(/STEPS/g, rmSettings.uRaymarchingSteps);
     fragShader = fragShader.replace(/REFLECTIONS/g, rmSettings.uReflections);
+    if (rmSettings.additive) fragShader = "#define ADDITIVE\n" + fragShader;
+    if (!rmSettings.metallic) fragShader = "#define DIFFUSE\n" + fragShader;
     prog = buildShaderProgram(vertShader, fragShader);
 }
 
-document.getElementById("fractal-iterations").onchange = function () {
-    uiParams.fractalIterations = getValue("fractal-iterations");
-    recompileShader();
-}
-document.getElementById("raymarching-steps").onchange = function () {
-    uiParams.raymarchingSteps = getValue("raymarching-steps");
-    recompileShader();
-}
-document.getElementById("shader-choice").onchange = function () {
-    uiParams.shaderChoice = document.getElementById("shader-choice").value;
-    recompileShader();
-}
+// document.getElementById("fractal-iterations").onchange = function () {
+//     uiParams.fractalIterations = getValue("fractal-iterations");
+//     recompileShader();
+// }
+// document.getElementById("raymarching-steps").onchange = function () {
+//     uiParams.raymarchingSteps = getValue("raymarching-steps");
+//     recompileShader();
+// }
+// document.getElementById("shader-choice").onchange = function () {
+//     uiParams.shaderChoice = document.getElementById("shader-choice").value;
+//     recompileShader();
+// }
 
 
 var prog;

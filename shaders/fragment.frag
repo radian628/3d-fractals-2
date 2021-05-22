@@ -2,6 +2,9 @@
     precision highp float;
 #endif
 
+//#define DIFFUSE
+//#define ADDITIVE
+
 uniform vec3 uPosition;
 uniform float time;
 uniform float scaleFactor;
@@ -162,6 +165,10 @@ vec3 getColor(vec3 position, vec3 normal, int steps, vec3 shadowPosition, vec3 b
     return baseColor * (1.0 - float(steps) / float(STEPS) * uAOStrength) * colorFactor;
 }
 
+vec3 rgbAsymptote(vec3 rgb) {
+    return 1.0 - 0.5 / (rgb + 0.5);
+}
+
 //marches the rays, calculates normals, determines and returns color, etc.
 void main() {
 	vec3 coords = gl_FragCoord.xyz / (uViewportSize.y) - vec3(uViewportSize.x / uViewportSize.y * 0.5, 0.5, 0.0);
@@ -191,17 +198,23 @@ void main() {
 
         vec3 reflectVec = reflect(cameraRay, normal);
         
-        rayStartPos = rayHit + reflectVec * uHitThreshold * 15.0;
-        cameraRay = reflectVec + vec3(
+        vec3 noise = vec3(
             rand(coords.xy + vec2(time, time)),
             rand(coords.xy + vec2(time + 234.0, -time)),
             rand(coords.xy + vec2(-time - 76.0, 55.0 + time))
         ) * uRoughness;
 
+        rayStartPos = rayHit + reflectVec * uHitThreshold * 15.0;
+        #ifdef DIFFUSE
+        cameraRay = normal + noise;
+        #else
+        cameraRay = reflectVec + noise;
+        #endif
     }
 
     outColor /= float(REFLECTIONS);
     outColor *= 2.0;
+    outColor = rgbAsymptote(outColor);
 
     /*
     vec3 reflectVec = reflect(cameraRay, normal);
@@ -231,6 +244,9 @@ void main() {
     //     colorFactor = uShadowBrightness;
 	// }
 	//gl_FragColor = vec4(outColor, 1.0);
-    gl_FragColor = mix(vec4(outColor, 1.0), vec4(texture2D(prevFrame, vTexCoord).rgb, 1.0), uTrail);//vec4(outColor * (1.0 - float(steps1) / float(STEPS)) * colorFactor, 1.0);
-    //gl_FragColor = vec4(normal * 0.5 + 0.5, 1.0);
+    #ifdef ADDITIVE
+    gl_FragColor = vec4(outColor, 1.0) * uTrail + vec4(texture2D(prevFrame, vTexCoord).rgb, 1.0);//vec4(outColor * (1.0 - float(steps1) / float(STEPS)) * colorFactor, 1.0);
+    #else
+    gl_FragColor = mix(vec4(outColor, 1.0), vec4(texture2D(prevFrame, vTexCoord).rgb, 1.0), uTrail);
+    #endif
 }
