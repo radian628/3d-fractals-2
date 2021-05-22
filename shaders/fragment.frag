@@ -179,8 +179,13 @@ void main() {
 
     vec3 outColor = vec3(0.0);
 
+    vec2 cameraNoiseVecs = vec2(
+        rand(vec2(time * 77.0, -123.3 * time) * coords.xy),
+        rand(vec2(time * -177.0, 346.0 * time) * coords.xy)
+    ) * coords.xy / uViewportSize;
+
     vec3 rayStartPos = uPosition;
-    vec3 cameraRay = rotateQuat(vec3(coords.x, 1.0, coords.y), uRotationQuaternion);
+    vec3 cameraRay = rotateQuat(vec3(coords.x + cameraNoiseVecs.x, 1.0, coords.y + cameraNoiseVecs.y), uRotationQuaternion);
 
     for (int i = 0; i < REFLECTIONS; i++) {
 
@@ -198,10 +203,12 @@ void main() {
 
         vec3 reflectVec = reflect(cameraRay, normal);
         
+        float floati = float(i + 1);
+
         vec3 noise = vec3(
-            rand(coords.xy + vec2(time, time)),
-            rand(coords.xy + vec2(time + 234.0, -time)),
-            rand(coords.xy + vec2(-time - 76.0, 55.0 + time))
+            rand(coords.xy + vec2(time, time) + floati),
+            rand(coords.xy + vec2(time + 234.0, -time) + floati),
+            rand(coords.xy + vec2(-time - 76.0, 55.0 + time) + floati)
         ) * uRoughness;
 
         rayStartPos = rayHit + reflectVec * uHitThreshold * 15.0;
@@ -248,5 +255,9 @@ void main() {
     gl_FragColor = vec4(outColor, 1.0) * uTrail + vec4(texture2D(prevFrame, vTexCoord).rgb, 1.0);//vec4(outColor * (1.0 - float(steps1) / float(STEPS)) * colorFactor, 1.0);
     #else
     gl_FragColor = mix(vec4(outColor, 1.0), vec4(texture2D(prevFrame, vTexCoord).rgb, 1.0), uTrail);
+    #endif
+
+    #ifdef RESET
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
     #endif
 }

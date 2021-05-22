@@ -1,6 +1,7 @@
 //Define canvas for WebGL.
 var c = document.getElementById("canvas");
 var gl = c.getContext("webgl2", { antialias: 0 });
+gl.getExtension("EXT_color_buffer_float");
 
 
 
@@ -593,6 +594,14 @@ async function recompileShader() {
     fragShader = fragShader.replace(/REFLECTIONS/g, rmSettings.uReflections);
     if (rmSettings.additive) fragShader = "#define ADDITIVE\n" + fragShader;
     if (!rmSettings.metallic) fragShader = "#define DIFFUSE\n" + fragShader;
+    if (rmSettings.additive) {
+        if (resetState == 0) {
+            fragShader = "#define RESET\n" + fragShader;
+            resetState = 2;
+        }
+    } else {
+        resetState = 0;
+    }
     prog = buildShaderProgram(vertShader, fragShader);
 }
 
@@ -618,8 +627,12 @@ let rmSettings;
 let prevFrame;
 let prevFramebuffer;
 
+let currentFrame;
+let currentFramebuffer;
+
 let blitProgram;
 
+let resetState = 0;
 
 //Initialize the stuff
 async function init() {
@@ -652,6 +665,7 @@ async function init() {
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
 
+    //======= PREVIOUS FRAME =========
     prevFrame = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, prevFrame);
 
@@ -659,7 +673,7 @@ async function init() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
     gl.texImage2D(
-        gl.TEXTURE_2D, 0, gl.RGBA, c.width, c.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null
+        gl.TEXTURE_2D, 0, gl.RGBA32F, c.width, c.height, 0, gl.RGBA, gl.FLOAT, null
     );
 
     prevFramebuffer = gl.createFramebuffer();
@@ -668,6 +682,24 @@ async function init() {
         gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, prevFrame, 0
     );
     
+    
+    //======= CURRENT FRAME =========
+    currentFrame = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, currentFrame);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    gl.texImage2D(
+        gl.TEXTURE_2D, 0, gl.RGBA32F, c.width, c.height, 0, gl.RGBA, gl.FLOAT, null
+    );
+
+    currentFramebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, currentFramebuffer);
+    gl.framebufferTexture2D(
+        gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, currentFrame, 0
+    );
+
     drawLoop();
 }
 
@@ -748,7 +780,7 @@ async function drawLoop() {
 
 
     //gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, currentFramebuffer);
 
 
     // gl.clearColor(1.0, 1.0, 1.0, 1.0);
@@ -800,37 +832,13 @@ async function drawLoop() {
 
 
 
-    //gl.flush();
-    
-    //gl.bindFramebuffer(gl.FRAMEBUFFER, prevFramebuffer);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, currentFramebuffer);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    gl.blitFramebuffer(0, 0, c.width, c.height, 0, 0, c.width, c.height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+        
 
-    //gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, c.width, c.height, 0);
-
-    //prevFrame = gl.createTexture(gl, c);
-
-
-    // gl.bindTexture(gl.TEXTURE_2D, prevFrame);
-
-    // gl.bindFramebuffer(gl.FRAMEBUFFER, prevFramebuffer);
-
-    // gl.useProgram(blitProgram);
-
-    // gl.uniform2fv(gl.getUniformLocation(blitProgram, "uViewportSize"), [c.width, c.height]);
-    
-    // aVertexPosition =
-    //   gl.getAttribLocation(prog, "aVertexPosition");
-
-    // gl.enableVertexAttribArray(aVertexPosition);
-    // gl.vertexAttribPointer(aVertexPosition, 2,
-    //     gl.FLOAT, false, 0, 0);
-    
-    // gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-    //gl.finish();
-
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    //gl.bindFramebuffer(gl.READ_FRAMEBUFFER, currentFramebuffer);
     gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, prevFramebuffer);
-    //gl.bindFramebuffer(gl.FRAMEBUFFER, prevFramebuffer);
     gl.blitFramebuffer(0, 0, c.width, c.height, 0, 0, c.width, c.height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
 
 
@@ -840,6 +848,10 @@ async function drawLoop() {
             saveAs(blob, "fractal_screenshot.png")
         });
         resizeWindow();
+        recompileShader();
+    }
+
+    if (resetState == 2) {
         recompileShader();
     }
     requestAnimationFrame(drawLoop);
