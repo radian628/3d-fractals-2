@@ -32,7 +32,7 @@ canvas {
     width: 200px;
     background: #333333;
     color: white;
-    border-radius: 8px;
+    border-radius: 5px;
     border: none;
 }
 
@@ -40,20 +40,21 @@ canvas {
     -webkit-appearance: none;
     appearance: none;
     background: #AACCFF;
-    width: 15px;
-    height: 15px;
-    border-radius: 7.5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
 }
 
 .range-input::-moz-range-thumb {
     background: #AACCFF;
-    width: 15px;
-    height: 15px;
-    border-radius: 7.5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
 }
 
 #ui label {
     color: #CCCCCC;
+    font-size: 75%;
 }
 
 #ui-container > * {

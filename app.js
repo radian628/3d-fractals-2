@@ -236,6 +236,30 @@ let raymarcherSettings = {
                     return Math.pow(10, num);
                 },
                 description: "Since rays asymptotically approach the surface of the fractal, they will never truly reach its surface, making it necessary to add a distance threshold, under which the rays will be considered to have hit the surface. This threshold is the Ray Hit Threshold. This setting scales logarithmically. See the Raymarching Steps setting for more information."
+            },
+            {
+                id: "uDofStrength",
+                type: "range",
+                min: -4,
+                max: 0,
+                value: -4,
+                label: "Depth of Field Strength",
+                transformer: num => {
+                    return Math.pow(10, num) - Math.pow(10, -4);
+                },
+                description: "Controls strength of the Depth of Field (DoF) effect. Scales logarithmically."
+            },
+            {
+                id: "uDofDistance",
+                type: "range",
+                min: -6,
+                max: 2,
+                value: -0.8,
+                label: "Focal Plane Distance",
+                transformer: num => {
+                    return Math.pow(10, num);
+                },
+                description: "Controls the distance of the camera's focal plane. Scales logarithmically."
             }
         ]
     }
@@ -874,6 +898,9 @@ async function drawLoop() {
     gl.uniform1f(gl.getUniformLocation(prog, "uRoughness"), rmSettings.uRoughness);
     gl.uniform1f(gl.getUniformLocation(prog, "uAOStrength"), rmSettings.uAOStrength);
     gl.uniform1f(gl.getUniformLocation(prog, "uTrail"), rmSettings.uTrail);
+
+    gl.uniform1f(gl.getUniformLocation(prog, "uDofStrength"), rmSettings.uDofStrength);
+    gl.uniform1f(gl.getUniformLocation(prog, "uDofDistance"), rmSettings.uDofDistance);
 
     //gl.
 

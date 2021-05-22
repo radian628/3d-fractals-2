@@ -21,6 +21,9 @@ uniform float uAOStrength;
 uniform sampler2D prevFrame;
 uniform float uTrail;
 
+uniform float uDofStrength;
+uniform float uDofDistance;
+
 varying highp vec2 vTexCoord; 
 
 //iteraetion count
@@ -183,10 +186,18 @@ void main() {
     vec2 cameraNoiseVecs = vec2(
         rand(vec2(time * 77.0, -123.3 * time) * coords.xy),
         rand(vec2(time * -177.0, 346.0 * time) * coords.xy)
-    ) * coords.xy / uViewportSize;
+    ) / uViewportSize * 1.5 * fov;
 
-    vec3 rayStartPos = uPosition;
-    vec3 cameraRay = rotateQuat(vec3(coords.x + cameraNoiseVecs.x, 1.0, coords.y + cameraNoiseVecs.y), uRotationQuaternion);
+    vec3 cameraPosVecs = vec3(
+        rand(vec2(time * 77.0, -123.3 * time) * coords.xy),
+        rand(vec2(time * -177.0, 346.0 * time) * coords.xy),
+        rand(vec2(time * 1277.0, 371.2 * time) * coords.xy)
+    ) * uDofStrength;
+
+    vec3 rayStartPos = uPosition + cameraPosVecs;
+    vec3 cameraRayGoal = rotateQuat(vec3(coords.x + cameraNoiseVecs.x, 1.0, coords.y + cameraNoiseVecs.y), uRotationQuaternion) * uDofDistance;
+
+    vec3 cameraRay = cameraRayGoal - cameraPosVecs;
 
     for (int i = 0; i < REFLECTIONS; i++) {
 
