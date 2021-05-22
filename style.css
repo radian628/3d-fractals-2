@@ -13,19 +13,16 @@ canvas {
     z-index: 0;
 }
 
-#ui {
-    background: #000000;
-    color: white;
-    opacity: 0.5;
+#settings {
     top: 0px;
     left: 0px;
     position: absolute;
     z-index: 1;
     padding: 10px;
-    transition: opacity, 0.3s;
     max-width: 30%;
-    max-height: 90%;
-    overflow: auto;
+    max-height: 80%;
+    overflow-y: auto;
+    overflow-x: visible;
     border-bottom-right-radius: 20px;
 }
 
@@ -59,7 +56,17 @@ canvas {
     color: #CCCCCC;
 }
 
-#ui:hover {
+#ui-container > * {
+    background: #000000;
+    color: white;
+}
+
+#ui-container {
+    opacity: 0.5;
+    transition: opacity, 0.3s;
+}
+
+#ui-container:hover {
     opacity: 1;
 }
 
@@ -74,4 +81,24 @@ h2 {
 h1, h2 {
     margin: 0px;
     margin-top: 15px;
+}
+
+.setting-label {
+    transition: color 0.2s;
+}
+
+.setting-label:hover {
+    color: white;
+}
+
+.hover-explanation-container {
+    position: absolute;
+    left: calc(30% + 20px);
+    border-radius: 20px;
+    padding: 15px;
+    top: 0;
+    z-index: 1;
+    max-width: 15%;
+    max-height: 35%;
+    overflow: auto;
 }

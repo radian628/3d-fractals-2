@@ -19,7 +19,8 @@ let raymarcherSettings = {
                 id: "hideUI",
                 type: "checkbox",
                 value: true,
-                label: "Hide UI when controlling viewer"
+                label: "Hide UI when controlling viewer",
+                description: "If enabled, the UI rectangle will disappear completely while controlling the viewer's rotation and locking the mouse. Otherwise, it will be transparent."
             },
             {
                 id: "playerSpeed",
@@ -30,7 +31,8 @@ let raymarcherSettings = {
                 label: "Player Speed",
                 transformer: num => {
                     return Math.pow(10, num);
-                }
+                },
+                description: "Controls how fast you can move with WASD, Space, and Shift. Scales logarithmically."
             }
         ]
     },
@@ -40,7 +42,8 @@ let raymarcherSettings = {
                 id: "screenshotUseScreenSize",
                 type: "checkbox",
                 value: true,
-                label: "Use size of current screen"
+                label: "Use size of current screen",
+                description: "When taking a screenshot, use the current screen size rather than a specified screen size."
             },
             {
                 id: "screenshotRaymarchingSteps",
@@ -48,19 +51,22 @@ let raymarcherSettings = {
                 min: 0,
                 max: 1024,
                 value: 512,
-                label: "Screenshot Raymarching Steps"
+                label: "Screenshot Raymarching Steps",
+                description: "When taking a screenshot, how many raymarching steps to use."
             },
             {
                 id: "screenshotWidth",
                 type: "number",
                 value: 1920,
-                label: "Screenshot Width (px)"
+                label: "Screenshot Width (px)",
+                description: "Width of screenshot in pixels."
             },
             {
                 id: "screenshotHeight",
                 type: "number",
                 value: 1080,
-                label: "Screenshot Height (px)"
+                label: "Screenshot Height (px)",
+                description: "Height of screenshot in pixels."
             }
         ]
     },
@@ -72,7 +78,8 @@ let raymarcherSettings = {
                 min: -Math.PI,
                 max: Math.PI,
                 value: 1,
-                label: "Fractal Rotation 1"
+                label: "Fractal Rotation 1",
+                description: "Fractal rotation on the X-axis."
             },
             {
                 id: "fractalRotation2",
@@ -80,7 +87,8 @@ let raymarcherSettings = {
                 min: -Math.PI,
                 max: Math.PI,
                 value: 1,
-                label: "Fractal Rotation 2"
+                label: "Fractal Rotation 2",
+                description: "Fractal rotation on the Y-axis."
             },
             {
                 id: "fractalRotation3",
@@ -88,7 +96,8 @@ let raymarcherSettings = {
                 min: -Math.PI,
                 max: Math.PI,
                 value: 1,
-                label: "Fractal Rotation 3"
+                label: "Fractal Rotation 3",
+                description: "Fractal rotation on the Z-axis."
             },
             {
                 id: "uFractalScaleFactor",
@@ -96,7 +105,8 @@ let raymarcherSettings = {
                 min: 0,
                 max: 1,
                 value: 0.5,
-                label: "Fractal Scale Factor"
+                label: "Fractal Scale Factor",
+                description: "Proportion to scale the cubes by during each fractal iteration."
             },
             {
                 id: "uFractalIterations",
@@ -106,7 +116,8 @@ let raymarcherSettings = {
                 value: 7,
                 step: 1,
                 label: "Fractal Iterations",
-                recompile: true
+                recompile: true,
+                description: "Number of fractal iterations to perform (more = more detail, but slower)."
             },
         ]
     },
@@ -117,21 +128,24 @@ let raymarcherSettings = {
                 type: "checkbox",
                 value: false,
                 label: "Additive Blending",
-                recompile: true
+                recompile: true,
+                description: "Enables additive blending. Additive blending adds the current frame's colors to that of the previous frame (rather than replacing or mixing it). With this setting enabled, Previous Frame Trail is repurposed as the amount of the current frame to add. This option is useful for accumulating lots of samples for global illumination renders."
             },
             {
                 id: "metallic",
                 type: "checkbox",
                 value: false,
                 label: "Metallic Material",
-                recompile: true
+                recompile: true,
+                description: "Enables mirror-like reflections."
             },
             {
                 id: "uFractalColor",
                 type: "color",
                 value: "#444444",
                 label: "Fractal Color",
-                transformer: hex2rgb
+                transformer: hex2rgb,
+                description: "Sets the color of the fractal. Currently unimplemented."
             },
             {
                 id: "uShadowBrightness",
@@ -139,7 +153,8 @@ let raymarcherSettings = {
                 min: 0,
                 max: 1,
                 value: 0.5,
-                label: "Shadow Brightness"
+                label: "Shadow Brightness",
+                description: "Sets the brightness of shaded areas. Set this to zero if attempting global illumination."
             },
             {
                 id: "uAOStrength",
@@ -147,7 +162,8 @@ let raymarcherSettings = {
                 min: 0,
                 max: 1,
                 value: 1.0,
-                label: "Ambient Occlusion Strength"
+                label: "Ambient Occlusion Strength",
+                description: "Determines the strength of the effect of Ambient Occlusion (AO). Ambient Occlusion darkens tight corners to simulate the difficulty of light reaching such a place. It is a rough approximation of how light tends to have difficulty reaching tight corners. Set this to zero if attempting global illumination."
             },
             {
                 id: "uTrail",
@@ -155,7 +171,8 @@ let raymarcherSettings = {
                 // min: 0,
                 // max: 1,
                 value: 0.0,
-                label: "Previous Frame Trail"
+                label: "Previous Frame Trail",
+                description: "Proportion of current frame to blend with previous. If Additive Blending is enabled, this instead determines how much of the current frame to add to the accumulated samples."
             },
             {
                 id: "uReflections",
@@ -165,7 +182,8 @@ let raymarcherSettings = {
                 value: 1,
                 step: 1,
                 label: "Reflections",
-                recompile: true
+                recompile: true,
+                description: "Number of reflections to calculate (requires lots of computation!)."
             },
             {
                 id: "uRoughness",
@@ -173,7 +191,8 @@ let raymarcherSettings = {
                 min: 0,
                 max: 0.99,
                 value: 0,
-                label: "Reflection Roughness"
+                label: "Reflection Roughness",
+                description: "Set low for a mirror-like finish. Set high for a blurrier appearance."
             },
             {
                 id: "uFOV",
@@ -181,7 +200,8 @@ let raymarcherSettings = {
                 min: 0,
                 max: 4,
                 value: 1.5,
-                label: "FOV"
+                label: "FOV",
+                description: "Sets the field of view."
             },
             {
                 id: "uRaymarchingSteps",
@@ -191,7 +211,8 @@ let raymarcherSettings = {
                 value: 24,
                 step: 1,
                 label: "Raymarching Steps",
-                recompile: true
+                recompile: true,
+                description: "Raymarching works by projecting rays from the viewer like a camera flash. These rays are marched forward in several steps, asymptotically approaching the surface they're rendering. This setting controls the maximum number of these steps. A higher value will lead to more detail, especially around tight corners and edges. However, it will also lead to a significant slowdown."
             },
             {
                 id: "normalRaymarchingSteps",
@@ -201,7 +222,8 @@ let raymarcherSettings = {
                 value: 8,
                 step: 1,
                 label: "Normal-finding Raymarching Steps",
-                recompile: true
+                recompile: true,
+                description: "Sets the number of raymarching steps for rays used to calculate normals. Low values are faster, but can lead to lighting artifacts, especially with geometry facing only barely towards the viewer (just under 90 degrees). See the section on Raymarching Steps for more information. "
             },
             {
                 id: "uRayHitThreshold",
@@ -212,29 +234,45 @@ let raymarcherSettings = {
                 label: "Ray Hit Threshold",
                 transformer: num => {
                     return Math.pow(10, num);
-                }
+                },
+                description: "Since rays asymptotically approach the surface of the fractal, they will never truly reach its surface, making it necessary to add a distance threshold, under which the rays will be considered to have hit the surface. This threshold is the Ray Hit Threshold. This setting scales logarithmically. See the Raymarching Steps setting for more information."
             }
         ]
     }
 }
 
-function createRaymarcherSettingsMenu(container, settings, recompileShaderHandler) {
+function createRaymarcherSettingsMenu(settingsContainer, uiContainer, settings, recompileShaderHandler) {
     let currentValues = {};
+    let bigHeader = document.createElement("h1");
+    settingsContainer.appendChild(bigHeader);
+    bigHeader.innerText = "Settings";
+
+    let hoverExplanationContainer = document.createElement("div");
+    hoverExplanationContainer.className = "hover-explanation-container";
+    uiContainer.appendChild(hoverExplanationContainer);
+
+    let hoverExplanationHeader = document.createElement("h2");
+    hoverExplanationContainer.appendChild(hoverExplanationHeader);
+
+    let hoverExplanationDescription = document.createElement("p");
+    hoverExplanationContainer.appendChild(hoverExplanationDescription);
+    hoverExplanationDescription.innerText = "Hover over a setting to view information about it.";
     Object.keys(settings).forEach(headerName => {
         let header = document.createElement("h2");
         header.innerText = headerName;
-        container.appendChild(header);
+        settingsContainer.appendChild(header);
 
         if (settings[headerName].description) {
             let desc = document.createElement("p");
             desc.innerText = settings[headerName].description;
-            container.appendChild(desc);
+            settingsContainer.appendChild(desc);
         }
 
         if (settings[headerName].settings) {
             settings[headerName].settings.forEach(setting => {
                 let label = document.createElement("label");
                 label.innerText = setting.label;
+                label.className = "setting-label";
 
                 let input = document.createElement("input");
                 input.type = setting.type;
@@ -276,15 +314,20 @@ function createRaymarcherSettingsMenu(container, settings, recompileShaderHandle
                 input.addEventListener("input", inputListener);
 
                 if (setting.recompile) {
-                    console.log("e")
                     input.addEventListener("change", e => {
                         recompileShaderHandler();
                     });
                 }
 
-                container.appendChild(label);
-                container.appendChild(input);
-                container.appendChild(document.createElement("br"));
+                label.addEventListener("mouseover", e => {
+                    hoverExplanationHeader.innerText = setting.label;
+                    hoverExplanationDescription.innerText = setting.description || "No description provided.";
+                    hoverExplanationContainer.style.top = `${label.getBoundingClientRect().y - hoverExplanationContainer.getBoundingClientRect().height / 2}px`;
+                });
+
+                settingsContainer.appendChild(label);
+                label.appendChild(input);
+                settingsContainer.appendChild(document.createElement("br"));
             });
         }
     });
@@ -310,9 +353,9 @@ function pointerLockHandler(e) {
     pointerLockEnabled = document.pointerLockElement === c ||
     document.mozPointerLockElement === c;
     if (pointerLockEnabled && rmSettings.hideUI) {
-        document.getElementById("ui").style.opacity = 0;
+        document.getElementById("ui-container").style.opacity = 0;
     } else {
-        document.getElementById("ui").style.opacity = null;
+        document.getElementById("ui-container").style.opacity = null;
     }
 }
 
@@ -700,10 +743,12 @@ async function init() {
     // var fragShader = (await request("fragment.glsl")).response;
     // prog = buildShaderProgram(vertShader, fragShader);
     
-    let uiElem = document.getElementById("ui");
-    uiElem.innerHTML = "";
+    let uiElem = document.getElementById("ui-container");
+    let settingsElem = document.getElementById("settings");
+    settingsElem.innerHTML = "";
     //while (uiElem.h) uiElem.removeChild(uiElem.lastChild);
     rmSettings = createRaymarcherSettingsMenu(
+        settingsElem,
         uiElem,
         raymarcherSettings,
         recompileShader
