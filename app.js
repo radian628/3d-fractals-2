@@ -3,12 +3,15 @@ var c = document.getElementById("canvas");
 var gl = c.getContext("webgl2", { antialias: 0 });
 gl.getExtension("EXT_color_buffer_float");
 
-
+//TODO:
+//Fix quaternion bug (rapid rotation messes it up) - complete
+//Improve normal calculations - complete
+//Fix framebuffer resize issue - complete
 
 //=============================== USER INTERFACE =================================
 let raymarcherSettings = {
     "Instructions": {
-        description: "Use WASD, Space, and Shift to move. Click the screen to control rotation w/ mouse, use escape to exit rotation mode. Press I to take a screenshot."
+        description: "Use WASD, Space, and Shift to move. Press E to move the light source. Click the screen to control rotation w/ mouse. Use escape to exit rotation mode. Press I to take a screenshot."
     },
     "UI and Viewer Controls": {
         settings: [
@@ -191,6 +194,16 @@ let raymarcherSettings = {
                 recompile: true
             },
             {
+                id: "normalRaymarchingSteps",
+                type: "range",
+                min: 0,
+                max: 64,
+                value: 8,
+                step: 1,
+                label: "Normal-finding Raymarching Steps",
+                recompile: true
+            },
+            {
                 id: "uRayHitThreshold",
                 type: "range",
                 min: -6,
@@ -313,17 +326,10 @@ document.addEventListener('mousemove', function (e) {
 
         playerTransform.quatRotation = quatMultiply(xRotation, playerTransform.quatRotation);
         playerTransform.quatRotation = quatMultiply(yRotation, playerTransform.quatRotation);
+        playerTransform.quatRotation = normalize(playerTransform.quatRotation);
     }
 });
 
-function resizeWindow() {
-    c.width = window.innerWidth;
-    c.height = window.innerHeight;
-}
-
-resizeWindow();
-
-window.addEventListener("resize", resizeWindow);
 
 var keys = {};
 document.addEventListener("keydown", function (e) {
@@ -479,6 +485,10 @@ function norm(v) {
     return v.reduce((acc, cur) => { return acc + cur * cur }, 0);
 }
 
+function normalize(v) {
+    return scalarDivide(v, Math.hypot(...v));
+}
+
 function scalarMultiply(v, s) {
     return v.map(e => { return e * s });
 }
@@ -582,16 +592,17 @@ var uiParams = {
     shaderChoice: "fragment.frag"
 }
 
+function replaceMacro(source, macroName, value) {
+    return source.replace(`#define ${macroName}`, `#define ${macroName} ${value} //`);
+}
 
 async function recompileShader() {
     var vertShader = (await request("shaders/vertex.vert")).response;
     var fragShader = (await request("shaders/" + uiParams.shaderChoice)).response;
-    fragShader = fragShader.replace("#define ITERATIONS", "//");
-    fragShader = fragShader.replace("#define STEPS", "//");
-    fragShader = fragShader.replace("#define REFLECTIONS", "//");
-    fragShader = fragShader.replace(/ITERATIONS/g, rmSettings.uFractalIterations + ".0");
-    fragShader = fragShader.replace(/STEPS/g, rmSettings.uRaymarchingSteps);
-    fragShader = fragShader.replace(/REFLECTIONS/g, rmSettings.uReflections);
+    fragShader = replaceMacro(fragShader, "ITERATIONS", rmSettings.uFractalIterations + ".0");
+    fragShader = replaceMacro(fragShader, "STEPS", rmSettings.uRaymarchingSteps);
+    fragShader = replaceMacro(fragShader, "NORMALSTEPS", rmSettings.normalRaymarchingSteps);
+    fragShader = replaceMacro(fragShader, "REFLECTIONS", rmSettings.uReflections);
     if (rmSettings.additive) fragShader = "#define ADDITIVE\n" + fragShader;
     if (!rmSettings.metallic) fragShader = "#define DIFFUSE\n" + fragShader;
     if (rmSettings.additive) {
@@ -634,37 +645,11 @@ let blitProgram;
 
 let resetState = 0;
 
-//Initialize the stuff
-async function init() {
+function resizeWindow() {
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;
 
-    var blitVShader = (await request("shaders/vertex.vert")).response;
-    var blitFShader = (await request("shaders/blit.frag")).response;
-    blitProgram = buildShaderProgram(blitVShader, blitFShader);
-    // var vertShader = (await request("vertex.glsl")).response;
-    // var fragShader = (await request("fragment.glsl")).response;
-    // prog = buildShaderProgram(vertShader, fragShader);
     
-    let uiElem = document.getElementById("ui");
-    uiElem.innerHTML = "";
-    //while (uiElem.h) uiElem.removeChild(uiElem.lastChild);
-    rmSettings = createRaymarcherSettingsMenu(
-        uiElem,
-        raymarcherSettings,
-        recompileShader
-    );
-
-
-    await recompileShader();
-    
-    var vertexArray = new Float32Array([
-    	-1, 1, 1, 1, 1, -1,
-     	-1, 1, 1, -1, -1, -1
-    ]);
-    
-    vertexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
-
     //======= PREVIOUS FRAME =========
     prevFrame = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, prevFrame);
@@ -699,6 +684,43 @@ async function init() {
     gl.framebufferTexture2D(
         gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, currentFrame, 0
     );
+}
+
+resizeWindow();
+
+window.addEventListener("resize", resizeWindow);
+
+//Initialize the stuff
+async function init() {
+
+    var blitVShader = (await request("shaders/vertex.vert")).response;
+    var blitFShader = (await request("shaders/blit.frag")).response;
+    blitProgram = buildShaderProgram(blitVShader, blitFShader);
+    // var vertShader = (await request("vertex.glsl")).response;
+    // var fragShader = (await request("fragment.glsl")).response;
+    // prog = buildShaderProgram(vertShader, fragShader);
+    
+    let uiElem = document.getElementById("ui");
+    uiElem.innerHTML = "";
+    //while (uiElem.h) uiElem.removeChild(uiElem.lastChild);
+    rmSettings = createRaymarcherSettingsMenu(
+        uiElem,
+        raymarcherSettings,
+        recompileShader
+    );
+
+
+    await recompileShader();
+    
+    var vertexArray = new Float32Array([
+    	-1, 1, 1, 1, 1, -1,
+     	-1, 1, 1, -1, -1, -1
+    ]);
+    
+    vertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
+
 
     drawLoop();
 }

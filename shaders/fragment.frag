@@ -27,6 +27,7 @@ varying highp vec2 vTexCoord;
 #define ITERATIONS 0.0
 
 #define STEPS 0
+#define NORMALSTEPS 0
 
 #define REFLECTIONS 1
 
@@ -100,7 +101,7 @@ vec3 marchNormalFindingRay(vec3 origin, vec3 direction) {
     vec3 directionNormalized = normalize(direction);
 	vec3 position = origin;
 	float minDist = 0.0;
-	for (int i = 0; i < STEPS; i++) {
+	for (int i = 0; i < NORMALSTEPS; i++) {
 		minDist = globalSDF(position);
 		position += directionNormalized * minDist;
 		// if (minDist < uHitThreshold) {
@@ -131,8 +132,8 @@ vec3 marchRayTrio(vec3 coords, vec3 direction, out float finalMinDist, out int s
 	vec3 dist = marchCameraRay(coords, direction, finalMinDist, stepsBeforeThreshold, color);
     vec3 dirNormal1 = normalize(cross(direction, vec3(1.0, 1.0, 1.0)));
     vec3 dirNormal2 = normalize(cross(direction, dirNormal1));
-    vec3 nDistX = marchNormalFindingRay(coords + dirNormal1 * 0.00024, direction);
-    vec3 nDistY = marchNormalFindingRay(coords + dirNormal2 * 0.00024, direction);
+    vec3 nDistX = marchNormalFindingRay(dist + dirNormal1 * 0.00024, direction);
+    vec3 nDistY = marchNormalFindingRay(dist + dirNormal2 * 0.00024, direction);
     normal = -normalize(cross(dist - nDistX, dist - nDistY));
     return dist;
 }
