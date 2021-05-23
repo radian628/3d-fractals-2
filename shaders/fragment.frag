@@ -24,6 +24,9 @@ uniform float uTrail;
 uniform float uDofStrength;
 uniform float uDofDistance;
 
+uniform float uSoftShadows;
+uniform float uLightStrength;
+
 varying highp vec2 vTexCoord; 
 
 //iteraetion count
@@ -31,8 +34,13 @@ varying highp vec2 vTexCoord;
 
 #define STEPS 0
 #define NORMALSTEPS 0
+#define TRANSMISSIONSTEPS 32
 
 #define REFLECTIONS 1
+
+#define TRANSMISSIONRAYS 2
+
+vec3 lambertLightLocation2;
 
 //rotate using quaternion
 vec3 rotateQuat(vec3 position, vec4 q)
@@ -63,10 +71,12 @@ float fractalSDF(vec3 rayPosition, vec3 spherePosition, float sphereRadius, out 
 	vec3 rayPos2 = rayPosition;
     float minDist = 99999.9;
     float minDist2 = 99999.9;
+    float minDist3 = 99999.9;
 	for (float i = 0.0; i < ITERATIONS; i++) {
 		rayPos2 = rayReflectIteration(rayPos2 / scaleFactor, vec3(-2.0), i);
         minDist = min(minDist, distance(rayPos2, vec3(0.5, 0.5, 0.5)));
         minDist2 = min(minDist2, distance(rayPos2, vec3(-0.9, 0.25, 1.5)));
+        minDist2 = min(minDist2, distance(rayPos2, vec3(1.9, -0.85, -0.3)));
 	}
     color = vec3(1.0, minDist * 0.5, minDist2 * 0.5);
 	return cubeSDF(rayPos2, spherePosition, sphereRadius) * pow(scaleFactor, ITERATIONS);
@@ -107,6 +117,17 @@ vec3 marchNormalFindingRay(vec3 origin, vec3 direction) {
 	for (int i = 0; i < NORMALSTEPS; i++) {
 		minDist = globalSDF(position);
 		position += directionNormalized * minDist;
+	}
+	return position;
+}
+
+vec3 marchTransmissionRay(vec3 origin, vec3 direction) {
+    vec3 directionNormalized = normalize(direction);
+	vec3 position = origin;
+	float minDist = 0.0;
+	for (int i = 0; i < TRANSMISSIONSTEPS; i++) {
+		minDist = globalSDF(position);
+		position += directionNormalized * minDist;
 		// if (minDist < uHitThreshold) {
         //     break;
 		// }
@@ -122,7 +143,7 @@ vec3 marchShadowRay(vec3 origin, vec3 direction, out float finalMinDist, out int
 	for (int i = 0; i < STEPS; i++) {
 		minDist = globalSDF(position);
 		position += directionNormalized * minDist;
-		if (minDist < uHitThreshold || sign(position.x - lambertLightLocation.x) != sign(origin.x - lambertLightLocation.x)) {
+		if (minDist < uHitThreshold || sign(position.x - lambertLightLocation2.x) != sign(origin.x - lambertLightLocation2.x)) {
 			stepsBeforeThreshold = i;
             break;
 		}
@@ -149,7 +170,7 @@ vec3 lightSource2 = vec3(1.0, 0.6, 0.5) * 2.5;
 vec3 lambertShading(vec3 color, vec3 normal, vec3 light) {
 	vec3 lightNormalized = normalize(light);
 	float lightIntensity = max(0.0, dot(normal, lightNormalized)) / dot(light, light);
-	return color * lightIntensity;
+	return color * lightIntensity * uLightStrength;
 }
 
 //random function I found on stackoverflow
@@ -160,8 +181,8 @@ float rand(vec2 co){
 vec3 getColor(vec3 position, vec3 normal, int steps, vec3 shadowPosition, vec3 baseColor) {
     float colorFactor;
     
-	if (sign(shadowPosition.x - lambertLightLocation.x) != sign(position.x - lambertLightLocation.x)) {
-        colorFactor = mix(uShadowBrightness, 1.0, lambertShading(vec3(1.0), normal, lambertLightLocation - position).x);//;
+	if (sign(shadowPosition.x - lambertLightLocation2.x) != sign(position.x - lambertLightLocation2.x)) {
+        colorFactor = mix(uShadowBrightness, 1.0, lambertShading(vec3(1.0), normal, lambertLightLocation2 - position).x);//;
 	} else {
         colorFactor = uShadowBrightness;
 	}
@@ -188,11 +209,15 @@ void main() {
         rand(vec2(time * -177.0, 346.0 * time) * coords.xy)
     ) / uViewportSize * 1.5 * fov;
 
-    vec3 cameraPosVecs = vec3(
+    vec3 noiseVec3 = vec3(
         rand(vec2(time * 77.0, -123.3 * time) * coords.xy),
         rand(vec2(time * -177.0, 346.0 * time) * coords.xy),
         rand(vec2(time * 1277.0, 371.2 * time) * coords.xy)
-    ) * uDofStrength;
+    );
+
+    vec3 cameraPosVecs = noiseVec3 *  uDofStrength;
+
+    lambertLightLocation2 = lambertLightLocation + noiseVec3 * uSoftShadows;
 
     vec3 rayStartPos = uPosition + cameraPosVecs;
     vec3 cameraRayGoal = rotateQuat(vec3(coords.x + cameraNoiseVecs.x, 1.0, coords.y + cameraNoiseVecs.y), uRotationQuaternion) * uDofDistance;
@@ -209,12 +234,22 @@ void main() {
         
         float shadowDistToSurface = 0.0;
         int shadowSteps = STEPS;
-        vec3 shadowRayHit1 = marchShadowRay(rayHit + (lambertLightLocation - rayHit) * uHitThreshold * 10.0, (lambertLightLocation - rayHit), shadowDistToSurface, shadowSteps);
+        vec3 shadowRayHit1 = marchShadowRay(rayHit + (lambertLightLocation2 - rayHit) * uHitThreshold * 10.0, (lambertLightLocation2 - rayHit), shadowDistToSurface, shadowSteps);
 
         outColor += getColor(rayHit, normal, steps1, shadowRayHit1, color);
 
         vec3 reflectVec = reflect(cameraRay, normal);
-        
+
+
+        for (int j = 0; j < TRANSMISSIONRAYS; j++) {
+            float randSample = rand(coords.xy + vec2(time + float(j) * 123.2, 2.34 * -time * float(j)));
+            vec3 transmissionSample = mix(rayHit, rayStartPos, randSample);
+            vec3 dirToLight = lambertLightLocation2 - transmissionSample;
+            vec3 transmissionRayHit = marchTransmissionRay(transmissionSample, dirToLight);
+            if (sign(transmissionRayHit.x - lambertLightLocation2.x) != sign(transmissionSample.x - transmissionRayHit.x)) outColor += vec3(0.05, 0.03, 0.01) / float(TRANSMISSIONRAYS);
+        }
+
+
         float floati = float(i + 1);
 
         vec3 noise = vec3(

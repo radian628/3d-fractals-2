@@ -121,16 +121,8 @@ let raymarcherSettings = {
             },
         ]
     },
-    "Rendering Controls": {
+    "Material Controls": {
         settings: [
-            {
-                id: "additive",
-                type: "checkbox",
-                value: false,
-                label: "Additive Blending",
-                recompile: true,
-                description: "Enables additive blending. Additive blending adds the current frame's colors to that of the previous frame (rather than replacing or mixing it). With this setting enabled, Previous Frame Trail is repurposed as the amount of the current frame to add. This option is useful for accumulating lots of samples for global illumination renders."
-            },
             {
                 id: "metallic",
                 type: "checkbox",
@@ -147,6 +139,19 @@ let raymarcherSettings = {
                 transformer: hex2rgb,
                 description: "Sets the color of the fractal. Currently unimplemented."
             },
+            {
+                id: "uRoughness",
+                type: "range",
+                min: 0,
+                max: 0.99,
+                value: 0,
+                label: "Reflection Roughness",
+                description: "Set low for a mirror-like finish. Set high for a blurrier appearance."
+            }
+        ]
+    },
+    "Lighting Controls": {
+        settings: [
             {
                 id: "uShadowBrightness",
                 type: "range",
@@ -166,15 +171,6 @@ let raymarcherSettings = {
                 description: "Determines the strength of the effect of Ambient Occlusion (AO). Ambient Occlusion darkens tight corners to simulate the difficulty of light reaching such a place. It is a rough approximation of how light tends to have difficulty reaching tight corners. Set this to zero if attempting global illumination."
             },
             {
-                id: "uTrail",
-                type: "number",
-                // min: 0,
-                // max: 1,
-                value: 0.0,
-                label: "Previous Frame Trail",
-                description: "Proportion of current frame to blend with previous. If Additive Blending is enabled, this instead determines how much of the current frame to add to the accumulated samples."
-            },
-            {
                 id: "uReflections",
                 type: "range",
                 min: 1,
@@ -186,23 +182,33 @@ let raymarcherSettings = {
                 description: "Number of reflections to calculate (requires lots of computation!)."
             },
             {
-                id: "uRoughness",
+                id: "uSoftShadows",
                 type: "range",
-                min: 0,
-                max: 0.99,
-                value: 0,
-                label: "Reflection Roughness",
-                description: "Set low for a mirror-like finish. Set high for a blurrier appearance."
+                min: -6,
+                max: 1,
+                value: -6,
+                label: "Shadow Softness",
+                transformer: num => {
+                    return Math.pow(10, num) - Math.pow(10, -6);
+                },
+                description: "Blends the edges of shadows. Scales logarithmically."
             },
             {
-                id: "uFOV",
+                id: "uLightStrength",
                 type: "range",
-                min: 0,
+                min: -4,
                 max: 4,
-                value: 1.5,
-                label: "FOV",
-                description: "Sets the field of view."
-            },
+                value: 0,
+                label: "Light Intensity",
+                transformer: num => {
+                    return Math.pow(10, num);
+                },
+                description: "Determines the intensity of the light source. Scales logarithmically."
+            }
+        ]
+    },
+    "Raymarching Controls": {
+        settings: [
             {
                 id: "uRaymarchingSteps",
                 type: "range",
@@ -236,6 +242,58 @@ let raymarcherSettings = {
                     return Math.pow(10, num);
                 },
                 description: "Since rays asymptotically approach the surface of the fractal, they will never truly reach its surface, making it necessary to add a distance threshold, under which the rays will be considered to have hit the surface. This threshold is the Ray Hit Threshold. This setting scales logarithmically. See the Raymarching Steps setting for more information."
+            },
+            {
+                id: "transmissionRaymarchingSteps",
+                type: "range",
+                min: 0,
+                max: 256,
+                value: 32,
+                step: 1,
+                label: "Transmission Raymarching Steps",
+                recompile: true,
+                description: "Determines the number of raymarching steps for transmission rays. See the description for Transmission Ray Steps for more information."
+            },
+            {
+                id: "transmissionRayCount",
+                type: "range",
+                min: 0,
+                max: 8,
+                value: 0,
+                step: 1,
+                label: "Transmission Ray Count",
+                recompile: true,
+                description: "Determines the number of transmission rays. Transmission rays are rays that replicate the effect of light shining through fog, creating so-called 'god rays'."
+            },
+        ]
+    },
+    "Camera Controls": {
+        settings: [
+            {
+                id: "additive",
+                type: "checkbox",
+                value: false,
+                label: "Additive Blending",
+                recompile: true,
+                description: "Enables additive blending. Additive blending adds the current frame's colors to that of the previous frame (rather than replacing or mixing it). With this setting enabled, Previous Frame Trail is repurposed as the amount of the current frame to add. This option is useful for accumulating lots of samples for global illumination renders."
+            },
+            {
+                id: "uTrail",
+                type: "number",
+                // min: 0,
+                // max: 1,
+                value: 0.0,
+                label: "Previous Frame Trail",
+                description: "Proportion of current frame to blend with previous. If Additive Blending is enabled, this instead determines how much of the current frame to add to the accumulated samples."
+            },
+            {
+                id: "uFOV",
+                type: "range",
+                min: 0,
+                max: 4,
+                value: 1.5,
+                label: "FOV",
+                description: "Sets the field of view."
             },
             {
                 id: "uDofStrength",
@@ -670,6 +728,8 @@ async function recompileShader() {
     fragShader = replaceMacro(fragShader, "STEPS", rmSettings.uRaymarchingSteps);
     fragShader = replaceMacro(fragShader, "NORMALSTEPS", rmSettings.normalRaymarchingSteps);
     fragShader = replaceMacro(fragShader, "REFLECTIONS", rmSettings.uReflections);
+    fragShader = replaceMacro(fragShader, "TRANSMISSIONSTEPS", rmSettings.transmissionRaymarchingSteps);
+    fragShader = replaceMacro(fragShader, "TRANSMISSIONRAYS", rmSettings.transmissionRayCount);
     if (rmSettings.additive) fragShader = "#define ADDITIVE\n" + fragShader;
     if (!rmSettings.metallic) fragShader = "#define DIFFUSE\n" + fragShader;
     if (rmSettings.additive) {
@@ -901,6 +961,9 @@ async function drawLoop() {
 
     gl.uniform1f(gl.getUniformLocation(prog, "uDofStrength"), rmSettings.uDofStrength);
     gl.uniform1f(gl.getUniformLocation(prog, "uDofDistance"), rmSettings.uDofDistance);
+
+    gl.uniform1f(gl.getUniformLocation(prog, "uSoftShadows"), rmSettings.uSoftShadows);
+    gl.uniform1f(gl.getUniformLocation(prog, "uLightStrength"), rmSettings.uLightStrength);
 
     //gl.
 
