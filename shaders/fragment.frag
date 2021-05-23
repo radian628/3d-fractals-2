@@ -6,19 +6,19 @@
 //#define ADDITIVE
 
 uniform vec3 uPosition;
-uniform float time;
-uniform float scaleFactor;
-uniform vec3 lambertLightLocation;
+uniform float uTime;
+uniform float uScaleFactor;
+uniform vec3 uLambertLightLocation;
 uniform vec4 uRotationQuaternion;
 uniform vec2 uViewportSize;
-uniform float fov;
+uniform float uFOV;
 uniform vec3 uFractalColor;
 uniform float uShadowBrightness;
 uniform float uHitThreshold;
 uniform vec4 uIterationRotationQuaternion;
 uniform float uRoughness;
 uniform float uAOStrength;
-uniform sampler2D prevFrame;
+uniform sampler2D uPrevFrame;
 uniform float uTrail;
 
 uniform float uDofStrength;
@@ -40,7 +40,7 @@ varying highp vec2 vTexCoord;
 
 #define TRANSMISSIONRAYS 2
 
-vec3 lambertLightLocation2;
+vec3 uLambertLightLocation2;
 
 //rotate using quaternion
 vec3 rotateQuat(vec3 position, vec4 q)
@@ -73,13 +73,13 @@ float fractalSDF(vec3 rayPosition, vec3 spherePosition, float sphereRadius, out 
     float minDist2 = 99999.9;
     float minDist3 = 99999.9;
 	for (float i = 0.0; i < ITERATIONS; i++) {
-		rayPos2 = rayReflectIteration(rayPos2 / scaleFactor, vec3(-2.0), i);
+		rayPos2 = rayReflectIteration(rayPos2 / uScaleFactor, vec3(-2.0), i);
         minDist = min(minDist, distance(rayPos2, vec3(0.5, 0.5, 0.5)));
         minDist2 = min(minDist2, distance(rayPos2, vec3(-0.9, 0.25, 1.5)));
         minDist2 = min(minDist2, distance(rayPos2, vec3(1.9, -0.85, -0.3)));
 	}
     color = vec3(1.0, minDist * 0.5, minDist2 * 0.5);
-	return cubeSDF(rayPos2, spherePosition, sphereRadius) * pow(scaleFactor, ITERATIONS);
+	return cubeSDF(rayPos2, spherePosition, sphereRadius) * pow(uScaleFactor, ITERATIONS);
 }
 
 //scene SDF
@@ -143,7 +143,7 @@ vec3 marchShadowRay(vec3 origin, vec3 direction, out float finalMinDist, out int
 	for (int i = 0; i < STEPS; i++) {
 		minDist = globalSDF(position);
 		position += directionNormalized * minDist;
-		if (minDist < uHitThreshold || sign(position.x - lambertLightLocation2.x) != sign(origin.x - lambertLightLocation2.x)) {
+		if (minDist < uHitThreshold || sign(position.x - uLambertLightLocation2.x) != sign(origin.x - uLambertLightLocation2.x)) {
 			stepsBeforeThreshold = i;
             break;
 		}
@@ -181,8 +181,8 @@ float rand(vec2 co){
 vec3 getColor(vec3 position, vec3 normal, int steps, vec3 shadowPosition, vec3 baseColor) {
     float colorFactor;
     
-	if (sign(shadowPosition.x - lambertLightLocation2.x) != sign(position.x - lambertLightLocation2.x)) {
-        colorFactor = mix(uShadowBrightness, 1.0, lambertShading(vec3(1.0), normal, lambertLightLocation2 - position).x);//;
+	if (sign(shadowPosition.x - uLambertLightLocation2.x) != sign(position.x - uLambertLightLocation2.x)) {
+        colorFactor = mix(uShadowBrightness, 1.0, lambertShading(vec3(1.0), normal, uLambertLightLocation2 - position).x);//;
 	} else {
         colorFactor = uShadowBrightness;
 	}
@@ -198,26 +198,26 @@ vec3 rgbAsymptote(vec3 rgb) {
 void main() {
 	vec3 coords = gl_FragCoord.xyz / (uViewportSize.y) - vec3(uViewportSize.x / uViewportSize.y * 0.5, 0.5, 0.0);
 	vec2 texCoords = coords.xy;
-    coords.x *= 1.5 * fov;
-	coords.y *= 1.5 * fov;
+    coords.x *= 1.5 * uFOV;
+	coords.y *= 1.5 * uFOV;
 	
 
     vec3 outColor = vec3(0.0);
 
     vec2 cameraNoiseVecs = vec2(
-        rand(vec2(time * 77.0, -123.3 * time) * coords.xy),
-        rand(vec2(time * -177.0, 346.0 * time) * coords.xy)
-    ) / uViewportSize * 1.5 * fov;
+        rand(vec2(uTime * 77.0, -123.3 * uTime) * coords.xy),
+        rand(vec2(uTime * -177.0, 346.0 * uTime) * coords.xy)
+    ) / uViewportSize * 1.5 * uFOV;
 
     vec3 noiseVec3 = vec3(
-        rand(vec2(time * 77.0, -123.3 * time) * coords.xy),
-        rand(vec2(time * -177.0, 346.0 * time) * coords.xy),
-        rand(vec2(time * 1277.0, 371.2 * time) * coords.xy)
+        rand(vec2(uTime * 77.0, -123.3 * uTime) * coords.xy),
+        rand(vec2(uTime * -177.0, 346.0 * uTime) * coords.xy),
+        rand(vec2(uTime * 1277.0, 371.2 * uTime) * coords.xy)
     );
 
-    vec3 cameraPosVecs = noiseVec3 *  uDofStrength;
+    vec3 cameraPosVecs = noiseVec3 * uDofStrength;
 
-    lambertLightLocation2 = lambertLightLocation + noiseVec3 * uSoftShadows;
+    uLambertLightLocation2 = uLambertLightLocation + noiseVec3 * uSoftShadows;
 
     vec3 rayStartPos = uPosition + cameraPosVecs;
     vec3 cameraRayGoal = rotateQuat(vec3(coords.x + cameraNoiseVecs.x, 1.0, coords.y + cameraNoiseVecs.y), uRotationQuaternion) * uDofDistance;
@@ -234,7 +234,7 @@ void main() {
         
         float shadowDistToSurface = 0.0;
         int shadowSteps = STEPS;
-        vec3 shadowRayHit1 = marchShadowRay(rayHit + (lambertLightLocation2 - rayHit) * uHitThreshold * 10.0, (lambertLightLocation2 - rayHit), shadowDistToSurface, shadowSteps);
+        vec3 shadowRayHit1 = marchShadowRay(rayHit + (uLambertLightLocation2 - rayHit) * uHitThreshold * 10.0, (uLambertLightLocation2 - rayHit), shadowDistToSurface, shadowSteps);
 
         outColor += getColor(rayHit, normal, steps1, shadowRayHit1, color);
 
@@ -242,20 +242,20 @@ void main() {
 
 
         for (int j = 0; j < TRANSMISSIONRAYS; j++) {
-            float randSample = rand(coords.xy + vec2(time + float(j) * 123.2, 2.34 * -time * float(j)));
+            float randSample = rand(coords.xy + vec2(uTime + float(j) * 123.2, 2.34 * -uTime * float(j)));
             vec3 transmissionSample = mix(rayHit, rayStartPos, randSample);
-            vec3 dirToLight = lambertLightLocation2 - transmissionSample;
+            vec3 dirToLight = uLambertLightLocation2 - transmissionSample;
             vec3 transmissionRayHit = marchTransmissionRay(transmissionSample, dirToLight);
-            if (sign(transmissionRayHit.x - lambertLightLocation2.x) != sign(transmissionSample.x - transmissionRayHit.x)) outColor += vec3(0.05, 0.03, 0.01) / float(TRANSMISSIONRAYS);
+            if (sign(transmissionRayHit.x - uLambertLightLocation2.x) != sign(transmissionSample.x - transmissionRayHit.x)) outColor += vec3(0.05, 0.03, 0.01) / float(TRANSMISSIONRAYS);
         }
 
 
         float floati = float(i + 1);
 
         vec3 noise = vec3(
-            rand(coords.xy + vec2(time, time) + floati),
-            rand(coords.xy + vec2(time + 234.0, -time) + floati),
-            rand(coords.xy + vec2(-time - 76.0, 55.0 + time) + floati)
+            rand(coords.xy + vec2(uTime, uTime) + floati),
+            rand(coords.xy + vec2(uTime + 234.0, -uTime) + floati),
+            rand(coords.xy + vec2(-uTime - 76.0, 55.0 + uTime) + floati)
         ) * uRoughness;
 
         rayStartPos = rayHit + reflectVec * uHitThreshold * 15.0;
@@ -281,9 +281,9 @@ void main() {
 
 	float shadowDistToSurface2 = 0.0;
 	int shadowSteps2 = STEPS;
-	vec3 shadowRayHit2 = marchShadowRay(rayHit2 + (lambertLightLocation - rayHit2) * uHitThreshold * 10.0, (lambertLightLocation - rayHit2), shadowDistToSurface, shadowSteps2);
+	vec3 shadowRayHit2 = marchShadowRay(rayHit2 + (uLambertLightLocation - rayHit2) * uHitThreshold * 10.0, (uLambertLightLocation - rayHit2), shadowDistToSurface, shadowSteps2);
     */
-    //vec3 outColor = (color + color2 * lambertShading(vec3(1.0), normal2, lambertLightLocation - dist2)) / 2.0;
+    //vec3 outColor = (color + color2 * lambertShading(vec3(1.0), normal2, uLambertLightLocation - dist2)) / 2.0;
 
     // vec3 outColor = (
     //     getColor(rayHit, normal, steps1, shadowRayHit1, color) +
@@ -292,19 +292,21 @@ void main() {
 
     // float colorFactor;
 
-	// if (sign(shadowRay.x - lambertLightLocation.x) != sign(dist.x - lambertLightLocation.x)) {
-    //     colorFactor = mix(uShadowBrightness, 1.0, lambertShading(vec3(1.0), normal, lambertLightLocation - dist).x);//;
+	// if (sign(shadowRay.x - uLambertLightLocation.x) != sign(dist.x - uLambertLightLocation.x)) {
+    //     colorFactor = mix(uShadowBrightness, 1.0, lambertShading(vec3(1.0), normal, uLambertLightLocation - dist).x);//;
 	// } else {
     //     colorFactor = uShadowBrightness;
 	// }
 	//gl_FragColor = vec4(outColor, 1.0);
     #ifdef ADDITIVE
-    gl_FragColor = vec4(outColor, 1.0) * uTrail + vec4(texture2D(prevFrame, vTexCoord).rgb, 1.0);//vec4(outColor * (1.0 - float(steps1) / float(STEPS)) * colorFactor, 1.0);
+    gl_FragColor = vec4(outColor, 1.0) * uTrail + vec4(texture2D(uPrevFrame, vTexCoord).rgb, 1.0);//vec4(outColor * (1.0 - float(steps1) / float(STEPS)) * colorFactor, 1.0);
     #else
-    gl_FragColor = mix(vec4(outColor, 1.0), vec4(texture2D(prevFrame, vTexCoord).rgb, 1.0), uTrail);
+    gl_FragColor = mix(vec4(outColor, 1.0), vec4(texture2D(uPrevFrame, vTexCoord).rgb, 1.0), uTrail);
     #endif
 
     #ifdef RESET
     gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
     #endif
+
+    //gl_FragColor = vec4(uIterationRotationQuaternion.rgb, 1.0);
 }
